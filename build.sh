@@ -23,6 +23,11 @@ cd Vocabulary
 tar -xf ORBvoc.txt.tar.gz
 cd ..
 
+projectdir=$(readlink -f $(dirname '$0'))
+export ROS_PACKAGE_PATH=${ROS_PACKAGE_PATH}:$projectdir/Examples/ROS
+export ROS_DISTRO=melodic
+export CMAKE_PREFIX_PATH=/opt/ros/${ROS_DISTRO}:/opt/ros/${ROS_DISTRO}/share
+
 echo "Configuring and building ORB_SLAM2 ..."
 
 mkdir build
@@ -38,10 +43,6 @@ echo "Converting vocabulary to binary version"
 cd ..
 
 echo "Building ROS nodes"
-
-export ROS_PACKAGE_PATH=${ROS_PACKAGE_PATH}:./Examples/ROS
-export ROS_DISTRO=kinetic
-export CMAKE_PREFIX_PATH=/opt/ros/${ROS_DISTRO}:/opt/ros/${ROS_DISTRO}/share
 
 cd Examples/ROS/ORB_SLAM2
 mkdir build
