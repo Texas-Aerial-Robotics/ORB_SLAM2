@@ -34,14 +34,14 @@ std::vector<cv::Mat> Converter::toDescriptorVector(const cv::Mat &Descriptors)
     return vDesc;
 }
 
-g2o::SE3Quat Converter::toSE3Quat(const cv::Mat &cvT)
+g2o::SE3Quat Converter::toSE3Quat(const cv::Mat &cvTi)
 {
     Eigen::Matrix<double,3,3> R;
-    R << cvT.at<float>(0,0), cvT.at<float>(0,1), cvT.at<float>(0,2),
-         cvT.at<float>(1,0), cvT.at<float>(1,1), cvT.at<float>(1,2),
-         cvT.at<float>(2,0), cvT.at<float>(2,1), cvT.at<float>(2,2);
+    R << cvTi.at<float>(0,0), cvTi.at<float>(0,1), cvTi.at<float>(0,2),
+         cvTi.at<float>(1,0), cvTi.at<float>(1,1), cvTi.at<float>(1,2),
+         cvTi.at<float>(2,0), cvTi.at<float>(2,1), cvTi.at<float>(2,2);
 
-    Eigen::Matrix<double,3,1> t(cvT.at<float>(0,3), cvT.at<float>(1,3), cvT.at<float>(2,3));
+    Eigen::Matrix<double,3,1> t(cvTi.at<float>(0,3), cvTi.at<float>(1,3), cvTi.at<float>(2,3));
 
     return g2o::SE3Quat(R,t);
 }

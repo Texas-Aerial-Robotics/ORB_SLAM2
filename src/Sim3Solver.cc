@@ -172,7 +172,7 @@ cv::Mat Sim3Solver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInli
             mvX3Dc1[idx].copyTo(P3Dc1i.col(i));
             mvX3Dc2[idx].copyTo(P3Dc2i.col(i));
 
-            vAvailableIndices[randi] = vAvailableIndices.back();
+            vAvailableIndices[idx] = vAvailableIndices.back();
             vAvailableIndices.pop_back();
         }
 
@@ -226,7 +226,7 @@ void Sim3Solver::ComputeCentroid(cv::Mat &P, cv::Mat &Pr, cv::Mat &C)
 void Sim3Solver::ComputeSim3(cv::Mat &P1, cv::Mat &P2)
 {
     // Custom implementation of:
-    // Horn 1987, Closed-form solution of absolute orientataion using unit quaternions
+    // Horn 1987, Closed-form solution of absolute orientation using unit quaternions
 
     // Step 1: Centroid and relative coordinates
 

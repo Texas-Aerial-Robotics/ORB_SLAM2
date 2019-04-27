@@ -25,6 +25,10 @@
 #include<opencv2/core/core.hpp>
 #include<opencv2/features2d/features2d.hpp>
 
+#include <ros/ros.h>
+#include "msg_conversions.h"
+#include <geometry_msgs/PoseStamped.h>
+
 #include"Viewer.h"
 #include"FrameDrawer.h"
 #include"Map.h"
@@ -37,11 +41,8 @@
 #include "Initializer.h"
 #include "MapDrawer.h"
 #include "System.h"
-#include "RvizDrawer.h"
-
-// ROS-related libraries
-#include <ros/ros.h>
-#include "std_msgs/String.h"
+#include "MultiMapper.h"
+#include "MapSerializer.h"
 
 #include <mutex>
 
@@ -54,35 +55,38 @@ class Map;
 class LocalMapping;
 class LoopClosing;
 class System;
+class MultiMapper;
+class MapSerializer;
 
 class Tracking
 {  
 
 public:
-
     Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
-             KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, bool bReuseMap=false);
-
-    Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
-             KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, ros::NodeHandle *nh,
-             bool bReuseMap=false);
+             MultiMapper* pMMapper, MapSerializer* pMapSerializer, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, bool bMMapping);
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
-    cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const std_msgs::Header &header);
-    cv::Mat GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const std_msgs::Header &header);
-    cv::Mat GrabImageMonocular(const cv::Mat &im, const std_msgs::Header &header);
+    cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp);
+    cv::Mat GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, const double &timestamp);
+    cv::Mat GrabImageMonocular(const cv::Mat &im, const double &timestamp);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
     void SetViewer(Viewer* pViewer);
-
+    
     // Load new settings
-    // The focal lenght should be similar or scale prediction will fail when projecting points
-    // TODO: Modify MapPoint::PredictScale to take into account focal lenght
+    // The focal length should be similar or scale prediction will fail when projecting points
+    // TODO: Modify MapPoint::PredictScale to take into account focal length
     void ChangeCalibration(const string &strSettingPath);
 
     // Use this function if you have deactivated local mapping and you only want to localize the camera.
     void InformOnlyTracking(const bool &flag);
+    
+    //Turn MultiMapping on/off from viewer
+    void InformMultiMapping(const bool &flag);
+    
+    //used by MMapper to draw baseMap at loopclosure event
+    void InformDrawMap(Map* pMap);
 
 
 public:
@@ -105,7 +109,6 @@ public:
     // Current Frame
     Frame mCurrentFrame;
     cv::Mat mImGray;
-    std_msgs::Header mCurImgHeader;
 
     // Initialization Variables (Monocular)
     std::vector<int> mvIniLastMatches;
@@ -125,6 +128,7 @@ public:
     bool mbOnlyTracking;
 
     void Reset();
+    void ReInit();
 
 protected:
 
@@ -173,7 +177,7 @@ protected:
     ORBVocabulary* mpORBVocabulary;
     KeyFrameDatabase* mpKeyFrameDB;
 
-    // Initalization (only for monocular)
+    // Initialization (only for monocular)
     Initializer* mpInitializer;
 
     //Local Map
@@ -191,6 +195,13 @@ protected:
 
     //Map
     Map* mpMap;
+    
+    //MultiMapper
+    MultiMapper* mpMMapper;
+    bool mbMMapping;
+    
+    //Map Serializer
+    MapSerializer* mpMapSerializer;
 
     //Calibration matrix
     cv::Mat mK;
@@ -203,7 +214,7 @@ protected:
 
     // Threshold close/far points
     // Points seen as close by the stereo/RGBD sensor are considered reliable
-    // and inserted from just one frame. Far points requiere a match in two keyframes.
+    // and inserted from just one frame. Far points require a match in two keyframes.
     float mThDepth;
 
     // For RGB-D inputs only. For some datasets (e.g. TUM) the depthmap values are scaled.
@@ -225,12 +236,9 @@ protected:
     bool mbRGB;
 
     list<MapPoint*> mlpTemporalPoints;
-
-    // ROS wrapper for publishing pose
-    ros::NodeHandle n_;
-    ros::Publisher pose_pub_world_frame_, pose_pub_cam_frame_;
-    std::string frame_id_ = "slam";
-    bool use_ros_ = false;
+    
+    //Used to calculate the time needed to initialize
+    std::chrono::steady_clock::time_point t1;
 };
 
 } //namespace ORB_SLAM

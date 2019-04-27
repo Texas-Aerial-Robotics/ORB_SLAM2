@@ -15,12 +15,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall   -O3 -march=native")
 
 # Check C++11 or C++0x support
 include(CheckCXXCompilerFlag)
-CHECK_CXX_COMPILER_FLAG("-std=c++11" COMPILER_SUPPORTS_CXX11)
+CHECK_CXX_COMPILER_FLAG("-std=c++17" COMPILER_SUPPORTS_CXX11)
 CHECK_CXX_COMPILER_FLAG("-std=c++0x" COMPILER_SUPPORTS_CXX0X)
 if(COMPILER_SUPPORTS_CXX11)
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 ")
    add_definitions(-DCOMPILEDWITHC11)
-   message(STATUS "Using flag -std=c++11.")
+   message(STATUS "Using flag -std=c++17.")
 elseif(COMPILER_SUPPORTS_CXX0X)
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
    add_definitions(-DCOMPILEDWITHC0X)
@@ -76,28 +76,32 @@ ${std_srvs_INCLUDE_DIRS}
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
 add_library(${PROJECT_NAME} SHARED
-src/System.cc
 src/Tracking.cc
-src/LocalMapping.cc
-src/LoopClosing.cc
-src/ORBextractor.cc
-src/ORBmatcher.cc
-src/FrameDrawer.cc
-src/Converter.cc
-src/MapPoint.cc
-src/KeyFrame.cc
-src/Map.cc
-src/MapDrawer.cc
-src/Optimizer.cc
-src/PnPsolver.cc
-src/Frame.cc
-src/KeyFrameDatabase.cc
+src/System.cc
 src/Sim3Solver.cc
+src/KeyFrame.cc
+src/KeyFrameDatabase.cc
+src/xmlMapDrawer.cc
 src/Initializer.cc
+src/Map.cc
+src/ORBmatcher.cc
+src/LocalMapping.cc
+src/MapPoint.cc
+src/tinyxml.cc
+src/ORBextractor.cc
+src/tinyxmlerror.cc
+src/MapDrawer.cc
+src/tinyxmlparser.cc
+src/LoopClosing.cc
+src/Frame.cc
+src/Optimizer.cc
+src/MapSerializer.cc
+src/FrameDrawer.cc
+src/PnPsolver.cc
+src/Converter.cc
+src/MultiMapper.cc
 src/Viewer.cc
-src/visualization_functions.cc
 src/msg_conversions.cc
-src/RvizDrawer.cc
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -106,7 +110,7 @@ ${EIGEN3_LIBS}
 ${Pangolin_LIBRARIES}
 ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
-${roscpp_LIBRARIES} 
+${roscpp_LIBRARIES}
 ${image_transport_LIBRARIES} 
 ${cv_bridge_LIBRARIES}
 )

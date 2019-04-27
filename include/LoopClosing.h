@@ -23,6 +23,7 @@
 
 #include "KeyFrame.h"
 #include "LocalMapping.h"
+#include "MultiMapper.h"
 #include "Map.h"
 #include "ORBVocabulary.h"
 #include "Tracking.h"
@@ -39,6 +40,7 @@ namespace ORB_SLAM2
 class Tracking;
 class LocalMapping;
 class KeyFrameDatabase;
+class MultiMapper;
 
 
 class LoopClosing
@@ -56,6 +58,8 @@ public:
     void SetTracker(Tracking* pTracker);
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
+    
+    void SetMultiMapper(MultiMapper* pMMapper);
 
     // Main function
     void Run();
@@ -66,6 +70,9 @@ public:
 
     // This function will run in a separate thread
     void RunGlobalBundleAdjustment(unsigned long nLoopKF);
+    void RunGlobalBundleAdjustmentonMap(Map* pMap, unsigned long nLoopKF);
+    
+    void RequestRunGBA(unsigned long nLoopKF = 0, Map* pMap = NULL);
 
     bool isRunningGBA(){
         unique_lock<std::mutex> lock(mMutexGBA);
@@ -77,10 +84,20 @@ public:
     }   
 
     void RequestFinish();
+    
+    void SetStopGBA(bool bStop);
 
     bool isFinished();
-
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    
+	//The following methods are to be used with Multimapper
+    void SwitchMap(Map* pMap);
+    void SwitchKFDB(KeyFrameDatabase* pKFDB);
+    
+    std::thread* GetGBAThread();
+    void SetmbRunningGBA(bool bVal);
+    bool GetmbRunningLoopClosing();
+    void SetmbFinishedGBA(bool bVal);
+    void InitGBAThread(int KFID);
 
 protected:
 
@@ -111,6 +128,8 @@ protected:
     ORBVocabulary* mpORBVocabulary;
 
     LocalMapping *mpLocalMapper;
+    
+    MultiMapper* mpMMapper;
 
     std::list<KeyFrame*> mlpLoopKeyFrameQueue;
 
@@ -131,6 +150,8 @@ protected:
     g2o::Sim3 mg2oScw;
 
     long unsigned int mLastLoopKFid;
+    
+    bool mbRunningLoopClosing;
 
     // Variables related to Global Bundle Adjustment
     bool mbRunningGBA;
@@ -138,14 +159,14 @@ protected:
     bool mbStopGBA;
     std::mutex mMutexGBA;
     std::thread* mpThreadGBA;
+    
+    //To ensure that GBA is done on the same map that has loop closure
+    Map* mpMapGBA;
 
     // Fix scale in the stereo/RGB-D case
     bool mbFixScale;
-
-
-    int mnFullBAIdx;
 };
 
-} //namespace ORB_SLAM
+} //namespace ORB_SLAM2
 
 #endif // LOOPCLOSING_H

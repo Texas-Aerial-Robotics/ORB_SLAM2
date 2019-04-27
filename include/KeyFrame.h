@@ -30,7 +30,7 @@
 #include "KeyFrameDatabase.h"
 
 #include <mutex>
-#include "BoostArchiver.h"
+
 
 namespace ORB_SLAM2
 {
@@ -43,8 +43,8 @@ class KeyFrameDatabase;
 class KeyFrame
 {
 public:
-
     KeyFrame(Frame &F, Map* pMap, KeyFrameDatabase* pKFDB);
+//    KeyFrame();
 
     // Pose functions
     void SetPose(const cv::Mat &Tcw);
@@ -105,6 +105,14 @@ public:
     // Set/check bad flag
     void SetBadFlag();
     bool isBad();
+    
+    //This to prevent deleting the first keyframe in subsequent maps
+    void SetOtherMapFirst();
+    bool isOtherMapFirst();
+    
+    bool isConnectedWithOtherMapKF();
+    void setConnectedWithOtherMapKF(bool bMMKeyframe);
+    void AddOtherMapKF(KeyFrame* pKF);
 
     // Compute Scene Depth (q=2 median). Used in monocular.
     float ComputeSceneMedianDepth(const int q);
@@ -116,16 +124,16 @@ public:
     static bool lId(KeyFrame* pKF1, KeyFrame* pKF2){
         return pKF1->mnId<pKF2->mnId;
     }
+    
+    void SwitchMap(Map* pMap);
+    void SwitchKFDB(KeyFrameDatabase* pKFDB);
+    
+    Frame* getSourceFrame();
+    
+    //Use FileStorage to write Keyframe to xml instead of TinyXml
+//    void write(cv::FileStorage& fs) const;
+//    void read(const cv::FileNode& node);
 
-public:
-    // for serialization
-    KeyFrame(); // Default constructor for serialization, need to deal with const member
-    void SetORBvocabulary(ORBVocabulary *porbv) {mpORBvocabulary=porbv;}
-private:
-    // serialize is recommended to be private
-    friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive &ar, const unsigned int version);
 
     // The following variables are accesed from only 1 thread or never change (no mutex needed).
 public:
@@ -161,6 +169,7 @@ public:
     // Variables used by loop closing
     cv::Mat mTcwGBA;
     cv::Mat mTcwBefGBA;
+    cv::Mat mTcwBefMerge;
     long unsigned int mnBAGlobalForKF;
 
     // Calibration parameters
@@ -197,10 +206,14 @@ public:
     const int mnMaxX;
     const int mnMaxY;
     const cv::Mat mK;
+    
+    Map* mpMap;
 
 
     // The following variables need to be accessed trough a mutex to be thread safe.
 protected:
+    
+    Frame* mpFrame;
 
     // SE3 Pose and camera center
     cv::Mat Tcw;
@@ -232,17 +245,22 @@ protected:
     // Bad flags
     bool mbNotErase;
     bool mbToBeErased;
-    bool mbBad;    
+    bool mbBad; 
+    
+    //In MultiMappig, when tracking is lost no resetting of mnId. This boolean is used to prevent deleting the first Keyframe of each map.
+    bool mbOtherMapFirst;
+    
+    //When updating connected keyframes check if they belong to other Maps
+    bool mbMMKeyframe;
+    std::set<KeyFrame*> mspMMNeighbours;
 
-    float mHalfBaseline; // Only for visualization
-
-    Map* mpMap;
+    float mHalfBaseline; // Only for visualization    
 
     std::mutex mMutexPose;
     std::mutex mMutexConnections;
     std::mutex mMutexFeatures;
 };
 
-} //namespace ORB_SLAM
+} //namespace ORB_SLAM2
 
 #endif // KEYFRAME_H

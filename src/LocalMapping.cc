@@ -83,7 +83,7 @@ void LocalMapping::Run()
                 // Check redundant local Keyframes
                 KeyFrameCulling();
             }
-
+            
             mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame);
         }
         else if(Stop())
@@ -91,7 +91,7 @@ void LocalMapping::Run()
             // Safe area to stop
             while(isStopped() && !CheckFinish())
             {
-                std::this_thread::sleep_for(std::chrono::microseconds(3000));
+                usleep(1000);
             }
             if(CheckFinish())
                 break;
@@ -105,7 +105,7 @@ void LocalMapping::Run()
         if(CheckFinish())
             break;
 
-        std::this_thread::sleep_for(std::chrono::microseconds(3000));
+        usleep(3000);
     }
 
     SetFinish();
@@ -430,7 +430,7 @@ void LocalMapping::CreateNewMapPoints()
             if(ratioDist*ratioFactor<ratioOctave || ratioDist>ratioOctave*ratioFactor)
                 continue;
 
-            // Triangulation is succesfull
+            // Triangulation is successful
             MapPoint* pMP = new MapPoint(x3D,mpCurrentKeyFrame,mpMap);
 
             pMP->AddObservation(mpCurrentKeyFrame,idx1);            
@@ -640,11 +640,13 @@ void LocalMapping::KeyFrameCulling()
     for(vector<KeyFrame*>::iterator vit=vpLocalKeyFrames.begin(), vend=vpLocalKeyFrames.end(); vit!=vend; vit++)
     {
         KeyFrame* pKF = *vit;
-        if(pKF->mnId==0)
+        if(pKF->mnId==0 || pKF->isOtherMapFirst())
             continue;
         const vector<MapPoint*> vpMapPoints = pKF->GetMapPointMatches();
 
-        int nObs = 3;
+        int /*nObs = 2;
+        if(mbMonocular)*/
+            nObs = 3;
         const int thObs=nObs;
         int nRedundantObservations=0;
         int nMPs=0;
@@ -716,7 +718,7 @@ void LocalMapping::RequestReset()
             if(!mbResetRequested)
                 break;
         }
-        std::this_thread::sleep_for(std::chrono::microseconds(3000));
+        usleep(3000);
     }
 }
 
@@ -755,6 +757,11 @@ bool LocalMapping::isFinished()
 {
     unique_lock<mutex> lock(mMutexFinish);
     return mbFinished;
+}
+
+void LocalMapping::SwitchMap(Map* pMap)
+{
+        mpMap = pMap;
 }
 
 } //namespace ORB_SLAM

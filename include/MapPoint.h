@@ -27,7 +27,6 @@
 
 #include<opencv2/core/core.hpp>
 #include<mutex>
-#include "BoostArchiver.h"
 
 namespace ORB_SLAM2
 {
@@ -79,17 +78,13 @@ public:
 
     float GetMinDistanceInvariance();
     float GetMaxDistanceInvariance();
-    int PredictScale(const float &currentDist, KeyFrame*pKF);
-    int PredictScale(const float &currentDist, Frame* pF);
-
-public:
-    // for serialization
-    MapPoint();
-private:
-    // serialize is recommended to be private
-    friend class boost::serialization::access;
-    template<class Archive>
-    void serialize(Archive &ar, const unsigned int version);
+    int PredictScale(const float &currentDist, const float &logScaleFactor);
+    
+    void SwitchMap(Map* pMap);
+    
+    //Use FileStorage to write MapPoint to xml instead of TinyXml
+//    void write(cv::FileStorage& fs) const;
+//    void read(const cv::FileNode& node);
 
 public:
     long unsigned int mnId;
@@ -157,6 +152,6 @@ protected:
      std::mutex mMutexFeatures;
 };
 
-} //namespace ORB_SLAM
+} //namespace ORB_SLAM2
 
 #endif // MAPPOINT_H

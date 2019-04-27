@@ -19,28 +19,40 @@
 */
 
 #include "Map.h"
+#include "Sim3Solver.h"
 
 #include<mutex>
 
 namespace ORB_SLAM2
 {
 
-Map::Map():mnMaxKFid(0),mnBigChangeIdx(0)
+Map::Map(unsigned int Id = 0):mnMaxKFid(0),mnMaxMPid(0),mbIsAttached(false)
 {
+    mnId = Id;
+    mnNxtId = Id + 1;
 }
+
 
 void Map::AddKeyFrame(KeyFrame *pKF)
 {
     unique_lock<mutex> lock(mMutexMap);
     mspKeyFrames.insert(pKF);
+    mpLastKF = pKF;
+    
+    if(!mpFirstKF)
+        mpFirstKF = pKF;
+       
     if(pKF->mnId>mnMaxKFid)
-        mnMaxKFid=pKF->mnId;
+        mnMaxKFid=pKF->mnId;    
 }
 
 void Map::AddMapPoint(MapPoint *pMP)
 {
     unique_lock<mutex> lock(mMutexMap);
+
     mspMapPoints.insert(pMP);
+    if(pMP->mnId > mnMaxMPid)
+        mnMaxMPid = pMP->mnId;
 }
 
 void Map::EraseMapPoint(MapPoint *pMP)
@@ -67,28 +79,71 @@ void Map::SetReferenceMapPoints(const vector<MapPoint *> &vpMPs)
     mvpReferenceMapPoints = vpMPs;
 }
 
-void Map::InformNewBigChange()
-{
-    unique_lock<mutex> lock(mMutexMap);
-    mnBigChangeIdx++;
-}
-
-int Map::GetLastBigChangeIdx()
-{
-    unique_lock<mutex> lock(mMutexMap);
-    return mnBigChangeIdx;
-}
-
 vector<KeyFrame*> Map::GetAllKeyFrames()
 {
     unique_lock<mutex> lock(mMutexMap);
     return vector<KeyFrame*>(mspKeyFrames.begin(),mspKeyFrames.end());
 }
 
+vector<KeyFrame*> Map::MMGetAllKeyFrames()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    vector<KeyFrame*> vpKFs = vector<KeyFrame*>(mspKeyFrames.begin(),mspKeyFrames.end());
+    if(this->isAttached())
+    {
+        vector<Map*> vpAttachedMaps = this->getAttachedMaps();
+        for(std::vector<Map*>::iterator it = vpAttachedMaps.begin(), itend = vpAttachedMaps.end(); it != itend; it++)
+        {
+            Map* pmMap = *it;
+            vector<KeyFrame*> vpAttachedKFs = pmMap->GetAllKeyFrames();            
+            vpKFs.insert(vpKFs.end(), vpAttachedKFs.begin(), vpAttachedKFs.end());            
+        }
+    }
+    return vpKFs;
+}
+
+std::vector<KeyFrame*> Map::GetAllKeyFramesAfter(KeyFrame* pKF)
+{
+    std::vector<KeyFrame*> vKeyFrames = GetAllKeyFrames();
+    std::vector<KeyFrame*> vKeyFramesResult;
+    for(std::vector<KeyFrame*>::iterator KFit = vKeyFrames.begin(), KFitEnd=vKeyFrames.end(); KFit != KFitEnd; KFit++)
+    {
+        KeyFrame* pKFi = *KFit;
+        if(pKFi->mnId > pKF->mnId)
+        {
+            vKeyFramesResult.push_back(pKFi);
+        }
+    }
+    
+    return vKeyFramesResult;
+
+}
+
+
 vector<MapPoint*> Map::GetAllMapPoints()
 {
     unique_lock<mutex> lock(mMutexMap);
     return vector<MapPoint*>(mspMapPoints.begin(),mspMapPoints.end());
+}
+
+vector<MapPoint*> Map::MMGetAllMapPoints()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    vector<MapPoint*> vpMP = vector<MapPoint*>(mspMapPoints.begin(),mspMapPoints.end());
+    if(this->isAttached())
+    {
+        vector<Map*> vpAttachedMaps = this->getAttachedMaps();
+        for(std::vector<Map*>::iterator it = vpAttachedMaps.begin(), itend = vpAttachedMaps.end(); it != itend; it++)
+        {
+            Map* pmMap = *it;
+           
+            vector<MapPoint*> vpAttachedMPs = pmMap->GetAllMapPoints();
+            
+            vpMP.insert(vpMP.end(), vpAttachedMPs.begin(), vpAttachedMPs.end());
+        }
+    }
+
+return vpMP;
 }
 
 long unsigned int Map::MapPointsInMap()
@@ -109,10 +164,23 @@ vector<MapPoint*> Map::GetReferenceMapPoints()
     return mvpReferenceMapPoints;
 }
 
+void Map::setMaxKFid(long unsigned int Id)
+{
+    unique_lock<mutex> lock(mMutexMap);
+    //cout<<"Setting Map"<<this->mnId<<" Max KFID to "<<Id;
+    mnMaxKFid = Id;
+}
+
 long unsigned int Map::GetMaxKFid()
 {
     unique_lock<mutex> lock(mMutexMap);
     return mnMaxKFid;
+}
+
+long unsigned int Map::GetMaxMPid()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    return mnMaxMPid;
 }
 
 void Map::clear()
@@ -130,19 +198,78 @@ void Map::clear()
     mvpKeyFrameOrigins.clear();
 }
 
-template<class Archive>
-void Map::serialize(Archive &ar, const unsigned int version)
+void Map::attachToMap(Map* pMap, g2o::Sim3 Pose)
 {
-    // don't save mutex
-    unique_lock<mutex> lock_MapUpdate(mMutexMapUpdate);
-    unique_lock<mutex> lock_Map(mMutexMap);
-    ar & mspMapPoints;
-    ar & mvpKeyFrameOrigins;
-    ar & mspKeyFrames;
-    ar & mvpReferenceMapPoints;
-    ar & mnMaxKFid & mnBigChangeIdx;
+    mbIsAttached = true;
+    mRelativePoses[pMap] = Pose;
+        
 }
-template void Map::serialize(boost::archive::binary_iarchive&, const unsigned int);
-template void Map::serialize(boost::archive::binary_oarchive&, const unsigned int);
 
-} //namespace ORB_SLAM
+bool Map::isAttachedToMap(Map* pMap)
+{
+    return mRelativePoses.count(pMap);
+}
+
+bool Map::isAttached()
+{
+    return mbIsAttached;
+}
+
+std::vector<Map*> Map::getAttachedMaps() 
+{
+    std::vector<Map*> vMaps;
+    
+    for(std::map<Map*, g2o::Sim3>::iterator it = mRelativePoses.begin(), itend=mRelativePoses.end(); it!=itend; it++)
+        vMaps.push_back(it->first);
+    
+    return vMaps;
+}
+
+g2o::Sim3 Map::relativePoseToAttachedMap(Map* pMap)
+{
+    if(this->isAttachedToMap(pMap))
+        return mRelativePoses[pMap];
+    
+    return g2o::Sim3();
+}
+
+
+
+void Map::printAttachedMaps()
+{
+    cout<<"Map"<<this->mnId<<" relative poses: \n";
+    for(std::map<Map*, g2o::Sim3>::iterator it = mRelativePoses.begin(), itend=mRelativePoses.end(); it!=itend; it++)
+    {
+        Map* pMap = it->first;
+        cv::Mat pose = Converter::toCvMat(it->second);
+        cout<<pMap->mnId<<endl;
+        cout<<pose<<endl;
+        cout<<"-----\n";
+    }
+    cout<<"---------------------------------\n";
+}
+
+//Use FileStorage to write Maps to xml instead of TinyXml
+//void Map::write(cv::FileStorage& fs) const
+//{
+//    fs<< "{" << "KeyFrames";
+//    //write the mspKeyFrames 
+//    for(set<KeyFrame*>::iterator sit=mspKeyFrames.begin(), send=mspKeyFrames.end(); sit!=send; sit++)
+//    {
+//        KeyFrame* pKFi=*sit;
+//        pKFi.write(fs);
+//    }
+//
+//    fs<< "MapPoints";
+//    //write mspMapPoints
+//    for(set<MapPoint*>::iterator sit=mspMapPoints.begin(), send=mspMapPoints.end(); sit!=send; sit++)
+//    {
+//        MapPoint* pMPi = *sit;
+//        pMPi.write(fs);
+//    }
+//
+//    fs<< "}";
+//}
+
+
+} //namespace ORB_SLAM2

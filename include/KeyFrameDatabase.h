@@ -30,7 +30,7 @@
 #include "ORBVocabulary.h"
 
 #include<mutex>
-#include "BoostArchiver.h"
+
 
 namespace ORB_SLAM2
 {
@@ -43,13 +43,17 @@ class KeyFrameDatabase
 {
 public:
 
-    KeyFrameDatabase(ORBVocabulary *voc);
+    KeyFrameDatabase(const ORBVocabulary &voc);
 
    void add(KeyFrame* pKF);
 
    void erase(KeyFrame* pKF);
 
    void clear();
+   
+   int size();
+   
+   bool empty();
 
    // Loop Detection
    std::vector<KeyFrame *> DetectLoopCandidates(KeyFrame* pKF, float minScore);
@@ -57,20 +61,11 @@ public:
    // Relocalization
    std::vector<KeyFrame*> DetectRelocalizationCandidates(Frame* F);
 
-public:
-   // for serialization
-   KeyFrameDatabase() {}
-   void SetORBvocabulary(ORBVocabulary *porbv) {mpVoc=porbv;}
-private:
-   // serialize is recommended to be private
-   friend class boost::serialization::access;
-   template<class Archive>
-   void serialize(Archive &ar, const unsigned int version);
-
 protected:
 
   // Associated vocabulary
-  ORBVocabulary* mpVoc;
+  const ORBVocabulary* mpVoc;
+  int mnNumberOfKFs;
 
   // Inverted file
   std::vector<list<KeyFrame*> > mvInvertedFile;

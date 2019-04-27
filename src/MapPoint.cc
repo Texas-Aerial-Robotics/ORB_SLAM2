@@ -30,7 +30,7 @@ long unsigned int MapPoint::nNextId=0;
 mutex MapPoint::mGlobalMutex;
 
 MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF, Map* pMap):
-    mnFirstKFid(pRefKF->mnId), mnFirstFrame(pRefKF->mnFrameId), nObs(0),mbTrackInView(false), mnTrackReferenceForFrame(0),
+    mnFirstKFid(pRefKF->mnId), mnFirstFrame(pRefKF->mnFrameId), nObs(0), mnTrackReferenceForFrame(0),
     mnLastFrameSeen(0), mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),
     mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false),
     mpReplaced(static_cast<MapPoint*>(NULL)), mfMinDistance(0), mfMaxDistance(0), mpMap(pMap)
@@ -44,7 +44,7 @@ MapPoint::MapPoint(const cv::Mat &Pos, KeyFrame *pRefKF, Map* pMap):
 }
 
 MapPoint::MapPoint(const cv::Mat &Pos, Map* pMap, Frame* pFrame, const int &idxF):
-    mnFirstKFid(-1), mnFirstFrame(pFrame->mnId), nObs(0),mbTrackInView(false), mnTrackReferenceForFrame(0), mnLastFrameSeen(0),
+    mnFirstKFid(-1), mnFirstFrame(pFrame->mnId), nObs(0), mnTrackReferenceForFrame(0), mnLastFrameSeen(0),
     mnBALocalForKF(0), mnFuseCandidateForKF(0),mnLoopPointForKF(0), mnCorrectedByKF(0),
     mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(static_cast<KeyFrame*>(NULL)), mnVisible(1),
     mnFound(1), mbBad(false), mpReplaced(NULL), mpMap(pMap)
@@ -91,8 +91,8 @@ cv::Mat MapPoint::GetNormal()
 
 KeyFrame* MapPoint::GetReferenceKeyFrame()
 {
-    unique_lock<mutex> lock(mMutexFeatures);
-    return mpRefKF;
+     unique_lock<mutex> lock(mMutexFeatures);
+     return mpRefKF;
 }
 
 void MapPoint::AddObservation(KeyFrame* pKF, size_t idx)
@@ -291,7 +291,7 @@ void MapPoint::ComputeDistinctiveDescriptors()
     {
         vector<int> vDists(Distances[i],Distances[i]+N);
         sort(vDists.begin(),vDists.end());
-        int median = vDists[0.5*(N-1)];
+        int median = vDists[0.5*(N-1)]; //OK with vectors not with arrays!
 
         if(median<BestMedian)
         {
@@ -302,7 +302,7 @@ void MapPoint::ComputeDistinctiveDescriptors()
 
     {
         unique_lock<mutex> lock(mMutexFeatures);
-        mDescriptor = vDescriptors[BestIdx].clone();
+        mDescriptor = vDescriptors[BestIdx].clone();       
     }
 }
 
@@ -354,7 +354,7 @@ void MapPoint::UpdateNormalAndDepth()
         cv::Mat normali = mWorldPos - Owi;
         normal = normal + normali/cv::norm(normali);
         n++;
-    }
+    } 
 
     cv::Mat PC = Pos - pRefKF->GetCameraCenter();
     const float dist = cv::norm(PC);
@@ -382,80 +382,20 @@ float MapPoint::GetMaxDistanceInvariance()
     return 1.2f*mfMaxDistance;
 }
 
-int MapPoint::PredictScale(const float &currentDist, KeyFrame* pKF)
+int MapPoint::PredictScale(const float &currentDist, const float &logScaleFactor)
 {
     float ratio;
     {
-        unique_lock<mutex> lock(mMutexPos);
+        unique_lock<mutex> lock3(mMutexPos);
         ratio = mfMaxDistance/currentDist;
     }
 
-    int nScale = ceil(log(ratio)/pKF->mfLogScaleFactor);
-    if(nScale<0)
-        nScale = 0;
-    else if(nScale>=pKF->mnScaleLevels)
-        nScale = pKF->mnScaleLevels-1;
-
-    return nScale;
+    return ceil(log(ratio)/logScaleFactor);
 }
 
-int MapPoint::PredictScale(const float &currentDist, Frame* pF)
+void MapPoint::SwitchMap(Map* pMap)
 {
-    float ratio;
-    {
-        unique_lock<mutex> lock(mMutexPos);
-        ratio = mfMaxDistance/currentDist;
-    }
+    mpMap = pMap;
+};
 
-    int nScale = ceil(log(ratio)/pF->mfLogScaleFactor);
-    if(nScale<0)
-        nScale = 0;
-    else if(nScale>=pF->mnScaleLevels)
-        nScale = pF->mnScaleLevels-1;
-
-    return nScale;
-}
-
-MapPoint::MapPoint():
-    nObs(0), mnTrackReferenceForFrame(0),
-    mnLastFrameSeen(0), mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),
-    mnCorrectedReference(0), mnBAGlobalForKF(0),mnVisible(1), mnFound(1), mbBad(false),
-    mpReplaced(static_cast<MapPoint*>(NULL)), mfMinDistance(0), mfMaxDistance(0)
-{}
-template<class Archive>
-void MapPoint::serialize(Archive &ar, const unsigned int version)
-{
-    // unique_lock<mutex> lock_Global(mGlobalMutex);
-    unique_lock<mutex> lock_Pos(mMutexPos);
-    unique_lock<mutex> lock_Features(mMutexFeatures);
-    ar & mnId & nNextId & mnFirstKFid & mnFirstFrame & nObs;
-    // Tracking related vars
-    ar & mTrackProjX;
-    ar & mTrackProjY;
-    ar & mTrackProjXR;
-    ar & mbTrackInView;
-    ar & mnTrackScaleLevel;
-    ar & mTrackViewCos;
-    ar & mnTrackReferenceForFrame;
-    ar & mnLastFrameSeen;
-    // Local Mapping related vars
-    ar & mnBALocalForKF & mnFuseCandidateForKF;
-    // Loop Closing related vars
-    ar & mnLoopPointForKF & mnCorrectedByKF & mnCorrectedReference & mPosGBA & mnBAGlobalForKF;
-    // don't save the mutex
-    ar & mWorldPos;
-    ar & mObservations;
-    ar & mNormalVector;
-    ar & mDescriptor;
-    ar & mpRefKF;
-    ar & mnVisible & mnFound;
-    ar & mbBad & mpReplaced;
-    ar & mfMinDistance & mfMaxDistance;
-    ar & mpMap;
-    // don't save the mutex
-}
-template void MapPoint::serialize(boost::archive::binary_iarchive&, const unsigned int);
-template void MapPoint::serialize(boost::archive::binary_oarchive&, const unsigned int);
-
-
-} //namespace ORB_SLAM
+} //namespace ORB_SLAM2

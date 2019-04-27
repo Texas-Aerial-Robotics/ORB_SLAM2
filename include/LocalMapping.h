@@ -71,6 +71,8 @@ public:
         unique_lock<std::mutex> lock(mMutexNewKFs);
         return mlNewKeyFrames.size();
     }
+    
+    void SwitchMap(Map* pMap);
 
 protected:
 

@@ -30,17 +30,18 @@ using namespace std;
 namespace ORB_SLAM2
 {
 
-KeyFrameDatabase::KeyFrameDatabase (ORBVocabulary *voc):
-    mpVoc(voc)
+KeyFrameDatabase::KeyFrameDatabase (const ORBVocabulary &voc):
+    mpVoc(&voc), mnNumberOfKFs(0)
 {
-    mvInvertedFile.resize(voc->size());
+    mvInvertedFile.resize(voc.size());
 }
 
 
 void KeyFrameDatabase::add(KeyFrame *pKF)
 {
     unique_lock<mutex> lock(mMutex);
-
+    mnNumberOfKFs++;
+    
     for(DBoW2::BowVector::const_iterator vit= pKF->mBowVec.begin(), vend=pKF->mBowVec.end(); vit!=vend; vit++)
         mvInvertedFile[vit->first].push_back(pKF);
 }
@@ -48,6 +49,8 @@ void KeyFrameDatabase::add(KeyFrame *pKF)
 void KeyFrameDatabase::erase(KeyFrame* pKF)
 {
     unique_lock<mutex> lock(mMutex);
+    if(mnNumberOfKFs > 0)
+        mnNumberOfKFs--;
 
     // Erase elements in the Inverse File for the entry
     for(DBoW2::BowVector::const_iterator vit=pKF->mBowVec.begin(), vend=pKF->mBowVec.end(); vit!=vend; vit++)
@@ -59,7 +62,7 @@ void KeyFrameDatabase::erase(KeyFrame* pKF)
         {
             if(pKF==*lit)
             {
-                lKFs.erase(lit);
+                lKFs.erase(lit);              
                 break;
             }
         }
@@ -308,18 +311,14 @@ vector<KeyFrame*> KeyFrameDatabase::DetectRelocalizationCandidates(Frame *F)
     return vpRelocCandidates;
 }
 
-template<class Archive>
-void KeyFrameDatabase::serialize(Archive &ar, const unsigned int version)
+bool KeyFrameDatabase::empty()
 {
-    // don't save associated vocabulary, KFDB restore by created explicitly from a new ORBvocabulary instance
-    // inverted file
-    {
-        unique_lock<mutex> lock_InvertedFile(mMutex);
-        ar & mvInvertedFile;
-    }
-    // don't save mutex
+    return mnNumberOfKFs == 0;
 }
-template void KeyFrameDatabase::serialize(boost::archive::binary_iarchive&, const unsigned int);
-template void KeyFrameDatabase::serialize(boost::archive::binary_oarchive&, const unsigned int);
+
+int KeyFrameDatabase::size()
+{
+    return mnNumberOfKFs;
+}
 
 } //namespace ORB_SLAM

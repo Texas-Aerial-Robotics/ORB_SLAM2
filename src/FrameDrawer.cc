@@ -29,12 +29,9 @@
 namespace ORB_SLAM2
 {
 
-FrameDrawer::FrameDrawer(Map* pMap, bool bReuseMap):mpMap(pMap)
+FrameDrawer::FrameDrawer(Map* pMap):mpMap(pMap)
 {
-    if (bReuseMap)
-        mState=Tracking::LOST;
-    else
-        mState=Tracking::SYSTEM_NOT_READY;
+    mState=Tracking::SYSTEM_NOT_READY;
     mIm = cv::Mat(480,640,CV_8UC3, cv::Scalar(0,0,0));
 }
 
@@ -42,7 +39,7 @@ cv::Mat FrameDrawer::DrawFrame()
 {
     cv::Mat im;
     vector<cv::KeyPoint> vIniKeys; // Initialization: KeyPoints in reference frame
-    vector<int> vMatches; // Initialization: correspondeces with reference keypoints
+    vector<int> vMatches; // Initialization: correspondences with reference keypoints
     vector<cv::KeyPoint> vCurrentKeys; // KeyPoints in current frame
     vector<bool> vbVO, vbMap; // Tracked MapPoints in current frame
     int state; // Tracking state
@@ -80,41 +77,42 @@ cv::Mat FrameDrawer::DrawFrame()
     //Draw
     if(state==Tracking::NOT_INITIALIZED) //INITIALIZING
     {
-        for(unsigned int i=0; i<vMatches.size(); i++)
-        {
-            if(vMatches[i]>=0)
+        if(vCurrentKeys.size() > 0)
+            for(unsigned int i=0; i<vMatches.size(); i++)
             {
-                cv::line(im,vIniKeys[i].pt,vCurrentKeys[vMatches[i]].pt,
-                        cv::Scalar(0,255,0));
-            }
-        }        
+                if(vMatches[i]>=0)
+                {
+                    cv::line(im,vIniKeys[i].pt,vCurrentKeys[vMatches[i]].pt,
+                            cv::Scalar(0,255,0));
+                }
+            }        
     }
     else if(state==Tracking::OK) //TRACKING
     {
         mnTracked=0;
         mnTrackedVO=0;
-        const float r = 5;
+        //const float r = 5;
         const int n = vCurrentKeys.size();
         for(int i=0;i<n;i++)
         {
             if(vbVO[i] || vbMap[i])
             {
                 cv::Point2f pt1,pt2;
-                pt1.x=vCurrentKeys[i].pt.x-r;
-                pt1.y=vCurrentKeys[i].pt.y-r;
-                pt2.x=vCurrentKeys[i].pt.x+r;
-                pt2.y=vCurrentKeys[i].pt.y+r;
+                //pt1.x=vCurrentKeys[i].pt.x-r;
+                //pt1.y=vCurrentKeys[i].pt.y-r;
+                //pt2.x=vCurrentKeys[i].pt.x+r;
+                //pt2.y=vCurrentKeys[i].pt.y+r;
 
                 // This is a match to a MapPoint in the map
                 if(vbMap[i])
                 {
-                    cv::rectangle(im,pt1,pt2,cv::Scalar(0,255,0));
+                    //cv::rectangle(im,pt1,pt2,cv::Scalar(0,255,0));
                     cv::circle(im,vCurrentKeys[i].pt,2,cv::Scalar(0,255,0),-1);
                     mnTracked++;
                 }
                 else // This is match to a "visual odometry" MapPoint created in the last frame
                 {
-                    cv::rectangle(im,pt1,pt2,cv::Scalar(255,0,0));
+                    //cv::rectangle(im,pt1,pt2,cv::Scalar(255,0,0));
                     cv::circle(im,vCurrentKeys[i].pt,2,cv::Scalar(255,0,0),-1);
                     mnTrackedVO++;
                 }
@@ -126,11 +124,6 @@ cv::Mat FrameDrawer::DrawFrame()
     DrawTextInfo(im,state, imWithInfo);
 
     return imWithInfo;
-}
-
-cv::Mat FrameDrawer::DrawFrame(std_msgs::Header *header) {
-    *header = mHeader;
-    return this->DrawFrame();
 }
 
 
@@ -149,13 +142,13 @@ void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
             s << "LOCALIZATION | ";
         int nKFs = mpMap->KeyFramesInMap();
         int nMPs = mpMap->MapPointsInMap();
-        s << "KFs: " << nKFs << ", MPs: " << nMPs << ", Matches: " << mnTracked;
+        s << "Map " << mpMap->mnId << " - KFs: " << nKFs << ", MPs: " << nMPs << ", Matches: " << mnTracked;
         if(mnTrackedVO>0)
             s << ", + VO matches: " << mnTrackedVO;
     }
     else if(nState==Tracking::LOST)
     {
-        s << " TRACK LOST. TRYING TO RELOCALIZE ";
+        s << " TRACK LOST. Creating a New Map ... ";
     }
     else if(nState==Tracking::SYSTEM_NOT_READY)
     {
@@ -172,7 +165,7 @@ void FrameDrawer::DrawTextInfo(cv::Mat &im, int nState, cv::Mat &imText)
 
 }
 
-void FrameDrawer::Update(Tracking *pTracker, const std_msgs::Header &header)
+void FrameDrawer::Update(Tracking *pTracker)
 {
     unique_lock<mutex> lock(mMutex);
     pTracker->mImGray.copyTo(mIm);
@@ -181,7 +174,6 @@ void FrameDrawer::Update(Tracking *pTracker, const std_msgs::Header &header)
     mvbVO = vector<bool>(N,false);
     mvbMap = vector<bool>(N,false);
     mbOnlyTracking = pTracker->mbOnlyTracking;
-    mHeader = header;
 
 
     if(pTracker->mLastProcessedState==Tracking::NOT_INITIALIZED)
@@ -207,6 +199,11 @@ void FrameDrawer::Update(Tracking *pTracker, const std_msgs::Header &header)
         }
     }
     mState=static_cast<int>(pTracker->mLastProcessedState);
+}
+
+void FrameDrawer::SwitchMap(Map* pMap)
+{
+    mpMap = pMap;
 }
 
 } //namespace ORB_SLAM

@@ -196,7 +196,7 @@ cv::Mat PnPsolver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInlie
 
             add_correspondence(mvP3Dw[idx].x,mvP3Dw[idx].y,mvP3Dw[idx].z,mvP2D[idx].x,mvP2D[idx].y);
 
-            vAvailableIndices[randi] = vAvailableIndices.back();
+            vAvailableIndices[idx] = vAvailableIndices.back();
             vAvailableIndices.pop_back();
         }
 
@@ -205,7 +205,7 @@ cv::Mat PnPsolver::iterate(int nIterations, bool &bNoMore, vector<bool> &vbInlie
 
         // Check inliers
         CheckInliers();
-
+        //cout<<"RANSAC Inliers = "<<mnInliersi<<endl;
         if(mnInliersi>=mRansacMinInliers)
         {
             // If it is the best solution so far, save it

@@ -74,7 +74,7 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
         vAllIndices.push_back(i);
     }
 
-    // Generate sets of 8 points for each RANSAC iteration
+    // Generate sets of 8 points for each RANSAC iteration - TODO: enhance the selection to choose best points.
     mvSets = vector< vector<size_t> >(mMaxIterations,vector<size_t>(8,0));
 
     DUtils::Random::SeedRandOnce(0);
@@ -110,12 +110,27 @@ bool Initializer::Initialize(const Frame &CurrentFrame, const vector<int> &vMatc
 
     // Compute ratio of scores
     float RH = SH/(SH+SF);
+    
+    //return ReconstructF(vbMatchesInliersF,F,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
 
     // Try to reconstruct from homography or fundamental depending on the ratio (0.40-0.45)
-    if(RH>0.40)
+    if(RH>0.45)
         return ReconstructH(vbMatchesInliersH,H,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
-    else //if(pF_HF>0.6)
+    else
         return ReconstructF(vbMatchesInliersF,F,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
+        
+//    if(RH>0.40)
+//    {
+//        bool b = ReconstructH(vbMatchesInliersH,H,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
+//        cout<<"RH= "<<RH<<"\t Homo is "<<b<<endl;
+//        return b;
+//    }
+//    else //if(pF_HF>0.6)
+//    {
+//        bool b = ReconstructF(vbMatchesInliersF,F,mK,R21,t21,vP3D,vbTriangulated,1.0,50);
+//        cout<<"RH= "<<RH<<"\t Fund is "<<b<<endl;
+//        return b;
+//    }
 
     return false;
 }
@@ -486,7 +501,7 @@ bool Initializer::ReconstructF(vector<bool> &vbMatchesInliers, cv::Mat &F21, cv:
     cv::Mat t1=t;
     cv::Mat t2=-t;
 
-    // Reconstruct with the 4 hyphoteses and check
+    // Reconstruct with the 4 hypotheses and check
     vector<cv::Point3f> vP3D1, vP3D2, vP3D3, vP3D4;
     vector<bool> vbTriangulated1,vbTriangulated2,vbTriangulated3, vbTriangulated4;
     float parallax1,parallax2, parallax3, parallax4;
